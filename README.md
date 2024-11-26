@@ -66,4 +66,4 @@ This project is licensed under the MIT License. See the `LICENSE` file for more 
 ---
 
 ### Author
-Created by [Your Name]. For questions or contributions, feel free to submit an issue or pull request.
+Created by Leon Furze. For questions or contributions, feel free to submit an issue or pull request.
