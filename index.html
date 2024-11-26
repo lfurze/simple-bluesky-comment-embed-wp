@@ -1,0 +1,167 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bluesky Comments</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      margin: 2em;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    #comments-section {
+      margin-top: 2em;
+      font-size: 0.9em;
+    }
+    .comment {
+      margin-bottom: 1em;
+      border-left: 2px solid #ddd;
+      padding-left: 1em;
+    }
+    .comment-thread {
+      margin-left: 2em;
+      border-left: 1px dashed #ccc;
+      padding-left: 1em;
+    }
+    .author {
+      display: flex;
+      align-items: center;
+      font-weight: bold;
+      margin-bottom: 0.5em;
+    }
+    .author img {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      margin-right: 0.5em;
+    }
+    .actions {
+      font-size: 0.8em;
+      color: #555;
+      margin-top: 0.5em;
+    }
+    hr {
+      border: 0;
+      height: 1px;
+      background: #ccc;
+      margin: 1em 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bluesky Comments</h1>
+  <p>
+    Reply on Bluesky 
+    <a id="post-link" href="#" target="_blank" rel="noopener noreferrer">here</a>
+    to join the conversation.
+  </p>
+  <hr />
+
+  <div id="comments-section">
+    <p>Loading comments...</p>
+  </div>
+
+  <script>
+    // Replace this with your Bluesky post URL
+    const postUrl = "https://bsky.app/profile/placeholder.did/post/placeholder-key";
+
+    const commentsSection = document.getElementById("comments-section");
+    const postLink = document.getElementById("post-link");
+
+    async function fetchDidFromHandle(handle) {
+      const response = await fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${handle}`);
+      if (!response.ok) {
+        throw new Error("Failed to resolve DID for handle");
+      }
+      const data = await response.json();
+      return data.did;
+    }
+
+    async function fetchThreadData(uri) {
+      const params = new URLSearchParams({ uri });
+      const response = await fetch(
+        `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?${params.toString()}`,
+        {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch post thread");
+      }
+
+      const data = await response.json();
+      return data.thread;
+    }
+
+    function createCommentElement(comment, isReply = false) {
+      const author = comment.post.author;
+      const text = comment.post.record.text;
+      const likes = comment.post.likeCount ?? 0;
+      const replies = comment.replies || [];
+      const commentContainer = document.createElement("div");
+      commentContainer.className = isReply ? "comment-thread" : "comment";
+
+      commentContainer.innerHTML = `
+        <div class="author">
+          <img src="${author.avatar || "https://via.placeholder.com/24"}" alt="avatar" />
+          <span>${author.displayName || author.handle} <small>@${author.handle}</small></span>
+        </div>
+        <p>${text}</p>
+        <div class="actions">
+          ${likes} likes
+        </div>
+      `;
+
+      if (replies.length > 0) {
+        replies.forEach(reply => {
+          if (reply.post && reply.post.record) {
+            const replyElement = createCommentElement(reply, true);
+            commentContainer.appendChild(replyElement);
+          }
+        });
+      }
+
+      return commentContainer;
+    }
+
+    async function loadComments() {
+      try {
+        const [_, handle, , rkey] = postUrl.split("/").slice(3); // Extract handle and record key from URL
+        const did = await fetchDidFromHandle(handle);
+        const uri = `at://${did}/app.bsky.feed.post/${rkey}`;
+
+        // Update post link
+        postLink.href = postUrl;
+
+        // Fetch thread data
+        const thread = await fetchThreadData(uri);
+
+        if (!thread.replies || thread.replies.length === 0) {
+          commentsSection.innerHTML = "<p>No comments yet.</p>";
+          return;
+        }
+
+        commentsSection.innerHTML = ""; // Clear loading text
+        thread.replies.forEach(reply => {
+          if (reply.post && reply.post.record) {
+            const commentElement = createCommentElement(reply);
+            commentsSection.appendChild(commentElement);
+          }
+        });
+      } catch (error) {
+        console.error(error);
+        commentsSection.innerHTML = "<p>Error loading comments.</p>";
+      }
+    }
+
+    loadComments();
+  </script>
+</body>
+</html>
